@@ -1,0 +1,11 @@
+{
+  "projectId": "hotfunnel-manager",
+  "appId": "1:840058660893:web:8f28b48a673d346739bef4",
+  "apiKey": "AIzaSyDzlOdKZR1BDrGWLYKpJ36OfaE-1vw0yUk",
+  "authDomain": "hotfunnel-manager.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-hotfunnelmanager-bdb1bf39-c031-4dba-b103-8ede5ee2a3c7",
+  "storageBucket": "hotfunnel-manager.firebasestorage.app",
+  "messagingSenderId": "840058660893",
+  "measurementId": "",
+  "oAuthClientId": "840058660893-bfrnjqipo75tm9efamuklu1s1mmr7g68.apps.googleusercontent.com"
+}

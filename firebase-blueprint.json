@@ -1,0 +1,32 @@
+{
+  "entities": {
+    "ModelProfile": {
+      "title": "ModelProfile",
+      "description": "A profile of a virtual model managed inside HotFunnel Manager.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "startDate": { "type": "string" },
+        "status": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "persona": { "type": "object" },
+        "funnelSteps": { "type": "array" },
+        "calendar": { "type": "array" },
+        "campaigns": { "type": "array" },
+        "products": { "type": "array" },
+        "notes": { "type": "string" },
+        "logs": { "type": "array" },
+        "savedRedditPages": { "type": "array" }
+      },
+      "required": ["id", "userId", "name", "startDate", "status"]
+    }
+  },
+  "firestore": {
+    "profiles/{profileId}": {
+      "schema": "ModelProfile",
+      "description": "Collection of all model profiles created by users."
+    }
+  }
+}

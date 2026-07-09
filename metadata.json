@@ -1,0 +1,6 @@
+{
+  "name": "HotFunnel Manager",
+  "description": "Plataforma co-piloto para gestão e otimização de múltiplos perfis de modelos e funis de conversão no nicho adulto/hot.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
