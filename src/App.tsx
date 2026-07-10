@@ -518,7 +518,8 @@ export default function App() {
         try {
           parsed = JSON.parse(data.text);
         } catch (e) {
-          const match = data.text.match(/\[\s*\{[\s\S]*\}\s*\]/);
+          // If the AI returned markdown fences or extra wrapper text, regex-extract the json block or array
+          const match = data.text.match(/\[\s*\{[\s\S]*\}\s*\]/) || data.text.match(/\{\s*[\s\S]*\}/);
           if (match) {
             try {
               parsed = JSON.parse(match[0]);
@@ -528,8 +529,20 @@ export default function App() {
           }
         }
 
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSuggestedSubreddits(parsed);
+        let parsedArray = null;
+        if (Array.isArray(parsed)) {
+          parsedArray = parsed;
+        } else if (parsed && typeof parsed === 'object') {
+          for (const key of Object.keys(parsed)) {
+            if (Array.isArray((parsed as any)[key])) {
+              parsedArray = (parsed as any)[key];
+              break;
+            }
+          }
+        }
+
+        if (Array.isArray(parsedArray) && parsedArray.length > 0) {
+          setSuggestedSubreddits(parsedArray);
         } else {
           setSuggestedSubreddits([]);
         }
@@ -781,8 +794,8 @@ export default function App() {
           // Attempt simple parse first
           parsed = JSON.parse(data.text);
         } catch (e) {
-          // If the AI returned markdown fences or extra wrapper text, regex-extract the json block
-          const match = data.text.match(/\[\s*\{[\s\S]*\}\s*\]/);
+          // If the AI returned markdown fences or extra wrapper text, regex-extract the json block or array
+          const match = data.text.match(/\[\s*\{[\s\S]*\}\s*\]/) || data.text.match(/\{\s*[\s\S]*\}/);
           if (match) {
             try {
               parsed = JSON.parse(match[0]);
@@ -792,8 +805,20 @@ export default function App() {
           }
         }
 
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const productsWithIds = parsed.map((p: any, idx: number) => ({
+        let parsedArray = null;
+        if (Array.isArray(parsed)) {
+          parsedArray = parsed;
+        } else if (parsed && typeof parsed === 'object') {
+          for (const key of Object.keys(parsed)) {
+            if (Array.isArray((parsed as any)[key])) {
+              parsedArray = (parsed as any)[key];
+              break;
+            }
+          }
+        }
+
+        if (Array.isArray(parsedArray) && parsedArray.length > 0) {
+          const productsWithIds = parsedArray.map((p: any, idx: number) => ({
             id: `prod-ia-${p.type.toLowerCase()}-${Date.now()}-${idx}`,
             type: p.type || 'Upsell',
             name: p.name || 'Produto Personalizado',

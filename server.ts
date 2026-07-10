@@ -10,6 +10,17 @@ dotenv.config({ path: ".env" });
 const app = express();
 app.use(express.json());
 
+// Enable CORS middleware for local development flexibility
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, x-gemini-api-key, x-openrouter-api-key, x-openrouter-model");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 const PORT = 3000;
 
 // Initialize GoogleGenAI SDK with fallback safety
@@ -618,33 +629,61 @@ INSTRUÇÕES DE ESCRITA MANDATÓRIAS:
   const openRouterModel = req.headers["x-openrouter-model"] || req.body?.customOpenRouterModel || "google/gemini-2.5-flash";
 
   if (openRouterKey && typeof openRouterKey === "string" && openRouterKey.trim() !== "") {
-    try {
-      console.log(`Using OpenRouter with model ${openRouterModel}`);
-      
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${openRouterKey.trim()}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://ai.studio/build",
-          "X-Title": "HotFunnel Manager"
-        },
-        body: JSON.stringify({
-          model: openRouterModel,
-          messages: [
-            { role: "system", content: systemInstruction },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.9,
-          response_format: (type === "generate-product-suite" || type === "suggest-subreddits") ? { type: "json_object" } : undefined
-        })
-      });
+    const modelsToTry = [
+      openRouterModel,
+      "google/gemini-2.5-flash",
+      "google/gemini-2.0-flash-exp",
+      "google/gemini-flash-1.5",
+      "meta-llama/llama-3.3-70b-instruct"
+    ];
+    let response = null;
+    let lastError = null;
 
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`OpenRouter API error (${response.status}): ${errText}`);
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`[API Generate] Attempting OpenRouter with model ${modelName}`);
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${openRouterKey.trim()}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://ai.studio/build",
+            "X-Title": "HotFunnel Manager"
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [
+              { role: "system", content: systemInstruction },
+              { role: "user", content: prompt }
+            ],
+            temperature: 0.9,
+            response_format: (type === "generate-product-suite" || type === "suggest-subreddits") ? { type: "json_object" } : undefined
+          })
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`OpenRouter API error (${res.status}): ${errText}`);
+        }
+
+        response = res;
+        console.log(`[API Generate] OpenRouter Success with model: ${modelName}`);
+        break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[API Generate] OpenRouter Failed with model ${modelName}:`, err.message || err);
+        // If it is a key validation or permission issue, fail early
+        if (err.message && (err.message.includes("401") || err.message.includes("API key"))) {
+          throw err;
+        }
       }
+    }
 
+    if (!response) {
+      throw lastError || new Error("Failed to generate content with OpenRouter.");
+    }
+
+    try {
       const data = await response.json();
       let text = data?.choices?.[0]?.message?.content || "";
 
@@ -655,7 +694,12 @@ INSTRUÇÕES DE ESCRITA MANDATÓRIAS:
           text = `${cleanCurrent} ${text}`;
         }
       } else if (type === "generate-product-suite" || type === "suggest-subreddits") {
-        // Keep raw JSON intact
+        // Keep raw JSON intact and strip markdown fences
+        let clean = text.trim();
+        clean = clean.replace(/^```json\s*/i, "");
+        clean = clean.replace(/^```\s*/i, "");
+        clean = clean.replace(/```$/i, "");
+        text = clean.trim();
       } else {
         text = cleanOutputTextUniversal(text, false);
       }
@@ -774,7 +818,12 @@ INSTRUÇÕES DE ESCRITA MANDATÓRIAS:
           text = `${cleanCurrent} ${text}`;
         }
       } else if (type === "generate-product-suite" || type === "suggest-subreddits") {
-        // Keep raw JSON intact
+        // Keep raw JSON intact and strip markdown fences
+        let clean = text.trim();
+        clean = clean.replace(/^```json\s*/i, "");
+        clean = clean.replace(/^```\s*/i, "");
+        clean = clean.replace(/```$/i, "");
+        text = clean.trim();
       } else {
         text = cleanOutputTextUniversal(text, false);
       }
