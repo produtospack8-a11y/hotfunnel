@@ -21,7 +21,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Initialize GoogleGenAI SDK with fallback safety
 const apiKey = process.env.GEMINI_API_KEY;
