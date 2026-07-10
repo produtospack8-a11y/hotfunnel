@@ -388,9 +388,16 @@ app.post("/api/generate", async (req, res) => {
 
   // Custom API key sent in header or request body
   const customKey = req.headers["x-gemini-api-key"] || req.body?.customApiKey;
+  const openRouterKey = req.headers["x-openrouter-api-key"] || req.body?.customOpenRouterApiKey;
+
+  console.log(`[API Generate] Type: ${type}`);
+  console.log(`[API Generate] Gemini Key received: ${customKey ? "YES (length: " + (typeof customKey === 'string' ? customKey.length : 'non-string') + ")" : "NO"}`);
+  console.log(`[API Generate] OpenRouter Key received: ${openRouterKey ? "YES" : "NO"}`);
+
   let requestAi = ai;
   if (customKey && typeof customKey === "string" && customKey.trim() !== "" && customKey.trim() !== "MY_GEMINI_API_KEY") {
     try {
+      console.log("[API Generate] Initializing GoogleGenAI client with custom key...");
       requestAi = new GoogleGenAI({
         apiKey: customKey.trim(),
         httpOptions: {
@@ -400,7 +407,7 @@ app.post("/api/generate", async (req, res) => {
         }
       });
     } catch (err) {
-      console.error("Error setting up custom request-level Gemini Client:", err);
+      console.error("[API Generate] Error setting up custom request-level Gemini Client:", err);
     }
   }
 
@@ -607,7 +614,6 @@ INSTRUÇÕES DE ESCRITA MANDATÓRIAS:
   }
 
   // If OpenRouter key is provided, route through OpenRouter
-  const openRouterKey = req.headers["x-openrouter-api-key"] || req.body?.customOpenRouterApiKey;
   const openRouterModel = req.headers["x-openrouter-model"] || req.body?.customOpenRouterModel || "google/gemini-2.5-flash";
 
   if (openRouterKey && typeof openRouterKey === "string" && openRouterKey.trim() !== "") {
@@ -709,11 +715,33 @@ INSTRUÇÕES DE ESCRITA MANDATÓRIAS:
         };
       }
 
-      const response = await requestAi.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: runConfig
-      });
+      const modelsToTry = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+      let response = null;
+      let lastError = null;
+
+      for (const modelName of modelsToTry) {
+        try {
+          console.log(`[API Generate] Attempting content generation with model: ${modelName}`);
+          response = await requestAi.models.generateContent({
+            model: modelName,
+            contents: prompt,
+            config: runConfig
+          });
+          console.log(`[API Generate] Success with model: ${modelName}`);
+          break;
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`[API Generate] Failed with model ${modelName}:`, err.message || err);
+          // If it is a key invalid error, fail early since trying other models won't help
+          if (err.message && (err.message.includes("API key not valid") || err.message.includes("API_KEY_INVALID"))) {
+            throw err;
+          }
+        }
+      }
+
+      if (!response) {
+        throw lastError || new Error("Failed to generate content with any model.");
+      }
       
       let text = response.text || "";
       if (type === "persona-field-completion") {
@@ -729,14 +757,14 @@ INSTRUÇÕES DE ESCRITA MANDATÓRIAS:
       }
       return res.json({ text, isAiGenerated: true });
     } catch (apiError: any) {
-      console.warn("Gemini API error, falling back to local simulation.", apiError?.message || apiError);
+      console.error("[API Generate] Gemini API error:", apiError);
       const fallback = getFallbackResponse(type, userPrompt, context);
       if (type === "generate-product-suite" || type === "suggest-subreddits") {
         return res.json({ text: fallback.text, isAiGenerated: false });
       }
       const cleanedFallback = cleanOutputTextUniversal(fallback.text, type === "persona-field-completion");
       return res.json({ 
-        text: `(Nota: Inteligência Local Ativa)\n\n${cleanedFallback}`, 
+        text: `(Nota: Inteligência Local Ativa - Erro: ${apiError?.message || JSON.stringify(apiError)})\n\n${cleanedFallback}`, 
         isAiGenerated: false 
       });
     }
