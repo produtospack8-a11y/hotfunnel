@@ -1,6 +1,6 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
+
 import { GoogleGenAI, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import dotenv from "dotenv";
 
@@ -857,6 +857,7 @@ INSTRUÇÕES DE ESCRITA MANDATÓRIAS:
 // Configure Vite middleware or serve static files
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -877,4 +878,10 @@ async function startServer() {
   });
 }
 
-startServer();
+if (process.env.VERCEL) {
+  console.log("Executando no Vercel (Serverless Function).");
+} else {
+  startServer();
+}
+
+export default app;
