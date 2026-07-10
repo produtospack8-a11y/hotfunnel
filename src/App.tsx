@@ -67,10 +67,25 @@ const apiGenerateFetch = async (url: string, init?: RequestInit) => {
     headers['x-openrouter-model'] = openRouterModel;
   }
   
-  return fetch(url, {
+  let newInit = {
     ...init,
     headers,
-  });
+  };
+
+  // Inject keys directly into the body as well to bypass gateway/proxy header stripping
+  if (init?.method === 'POST' && init.body && typeof init.body === 'string') {
+    try {
+      const parsedBody = JSON.parse(init.body);
+      parsedBody.customApiKey = customKey;
+      parsedBody.customOpenRouterApiKey = openRouterKey;
+      parsedBody.customOpenRouterModel = openRouterModel;
+      newInit.body = JSON.stringify(parsedBody);
+    } catch (e) {
+      console.error("Error injecting keys in body:", e);
+    }
+  }
+  
+  return fetch(url, newInit);
 };
 
 export default function App() {
